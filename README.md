@@ -1,1 +1,3 @@
 # znake
+
+simple snake game
