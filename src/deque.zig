@@ -1,3 +1,4 @@
+// this file belongs to https://github.com/magurotuna/zig-deque/
 const std = @import("std");
 const mem = std.mem;
 const math = std.math;
