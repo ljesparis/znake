@@ -15,10 +15,13 @@ const mapWidth = windowWidth - offset * 2;
 const mapHeight = windowHeight - offset * 2;
 const mapLineTick = 5;
 
+const defaultDirection: rl.Vector2 = .{ .x = 1, .y = 0 };
+
 const Snake = struct {
     body: Deque(rl.Vector2),
-    direction: rl.Vector2,
-    growth: bool,
+    growth: bool = false,
+    direction: rl.Vector2 = defaultDirection,
+
     allocator: *std.mem.Allocator,
 
     const Self = @This();
@@ -26,7 +29,6 @@ const Snake = struct {
     pub fn init(allocator: *std.mem.Allocator) anyerror!Self {
         var self: Self = .{
             .allocator = allocator,
-            .direction = .{ .x = 1, .y = 0 },
             .growth = false,
             .body = try Deque(rl.Vector2).init(allocator.*),
         };
@@ -46,7 +48,7 @@ const Snake = struct {
         try self.body.pushBack(rl.Vector2.init(7, 5));
         try self.body.pushBack(rl.Vector2.init(6, 5));
         try self.body.pushBack(rl.Vector2.init(5, 5));
-        self.direction = .{ .x = 1, .y = 0 };
+        self.direction = defaultDirection;
     }
 
     pub fn deinit(self: *Self) void {
