@@ -93,11 +93,19 @@ const Snake = struct {
 
 const Apple = struct {
     position: rl.Vector2,
+    sprite: rl.Texture2D,
 
     const Self = @This();
 
-    pub fn init() Self {
-        return .{ .position = generateRandomVector() };
+    pub fn init() !Self {
+        return .{
+            .position = generateRandomVector(),
+            .sprite = try rl.loadTexture("apple.png"),
+        };
+    }
+
+    pub fn deinit(self: *Self) void {
+        self.sprite.unload();
     }
 
     pub fn changePosition(self: *Self, snake: *Snake) void {
@@ -120,12 +128,17 @@ const Apple = struct {
     }
 
     pub fn draw(self: *Self) void {
-        rl.drawRectangleRounded(rl.Rectangle.init(
-            offset + self.position.x * cellSize,
-            offset + self.position.y * cellSize,
-            cellSize,
-            cellSize,
-        ), 0.5, 2, darkGreen);
+        rl.drawTextureRec(
+            self.sprite,
+            rl.Rectangle.init(
+                0,
+                0,
+                cellSize,
+                cellSize,
+            ),
+            rl.Vector2.init(offset + self.position.x * cellSize, offset + self.position.y * cellSize),
+            .{ .r = 255, .g = 255, .b = 255, .a = 255 },
+        );
     }
 };
 
@@ -140,12 +153,13 @@ const Game = struct {
     pub fn init(allocator: *std.mem.Allocator) anyerror!Self {
         return .{
             .snake = try .init(allocator),
-            .apple = .init(),
+            .apple = try .init(),
         };
     }
 
     pub fn deinit(self: *Self) void {
         self.snake.deinit();
+        self.apple.deinit();
     }
 
     pub fn draw(self: *Self) anyerror!void {
@@ -163,16 +177,16 @@ const Game = struct {
         if (!self.running) return;
 
         try self.snake.update();
+        const head = self.snake.body.popFront().?;
 
         // check collision with apple
-        if (rl.math.vector2Equals(self.snake.head().*, self.apple.position) > 0) {
+        if (head.equals(self.apple.position) > 0) {
             self.snake.growth = true;
             self.apple.changePosition(&self.snake);
             self.points += 1;
         }
 
         // check collision with any wall
-        const head = self.snake.body.popFront().?;
         std.debug.print("Snake(x: {}, y: {})\n", .{ head.x, head.y });
         if (head.x == mapWidth / cellSize or head.x == -1 or head.y == -1 or head.y == mapHeight / cellSize) {
             try self.gameOver();
@@ -202,10 +216,7 @@ const Game = struct {
 
         if (!self.running) {
             switch (key) {
-                .a => self.running = true,
-                .s => self.running = true,
-                .d => self.running = true,
-                .w => self.running = true,
+                .a, .s, .d, .w => self.running = true,
                 else => {},
             }
         }
@@ -213,7 +224,6 @@ const Game = struct {
 };
 
 var lastUpdateTime: f64 = 0.0;
-
 fn eventTriggered(interval: f64) bool {
     const currentTime: f64 = rl.getTime();
     if (currentTime - lastUpdateTime >= interval) {
@@ -223,16 +233,13 @@ fn eventTriggered(interval: f64) bool {
     return false;
 }
 
-pub fn main() anyerror!void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer {
-        const deinit_status = gpa.deinit();
-        if (deinit_status == .leak) @panic("TEST FAIL");
-    }
+var stack_buffer: [100_000_000]u8 = undefined;
 
+pub fn main() anyerror!void {
+    var gpa = std.heap.FixedBufferAllocator.init(&stack_buffer);
     var allocator = gpa.allocator();
 
-    rl.initWindow(cellSize * cellCount, cellSize * cellCount, "Retro snake");
+    rl.initWindow(windowWidth, windowHeight, "Retro snake");
     defer rl.closeWindow();
 
     rl.setTargetFPS(60);
