@@ -7,7 +7,7 @@ const darkGreen = rl.Color.init(43, 51, 24, 255); // dark green
 
 const cellSize = 30;
 const cellCount = 25;
-const offset = 70;
+const offset = 75;
 
 const windowWidth = cellSize * cellCount;
 const windowHeight = cellSize * cellCount;
@@ -23,14 +23,16 @@ const Snake = struct {
     direction: rl.Vector2 = defaultDirection,
 
     allocator: *std.mem.Allocator,
+    sound: *const rl.Sound,
 
     const Self = @This();
 
-    pub fn init(allocator: *std.mem.Allocator) anyerror!Self {
+    pub fn init(allocator: *std.mem.Allocator, eatSound: *const rl.Sound) anyerror!Self {
         var self: Self = .{
             .allocator = allocator,
             .growth = false,
             .body = try Deque(rl.Vector2).init(allocator.*),
+            .sound = eatSound,
         };
 
         try self.reset();
@@ -53,6 +55,10 @@ const Snake = struct {
 
     pub fn deinit(self: *Self) void {
         self.body.deinit();
+    }
+
+    pub fn makeSound(self: *Self) void {
+        rl.playSound(self.sound.*);
     }
 
     pub fn draw(self: *Self) void {
@@ -152,9 +158,9 @@ const Game = struct {
 
     const Self = @This();
 
-    pub fn init(allocator: *std.mem.Allocator) anyerror!Self {
+    pub fn init(allocator: *std.mem.Allocator, eatSound: *const rl.Sound) anyerror!Self {
         return .{
-            .snake = try .init(allocator),
+            .snake = try .init(allocator, eatSound),
             .apple = try .init(),
         };
     }
@@ -186,6 +192,7 @@ const Game = struct {
             self.snake.growth = true;
             self.apple.changePosition(&self.snake);
             self.points += 1;
+            self.snake.makeSound();
         }
 
         // check collision with any wall
@@ -242,11 +249,23 @@ pub fn main() anyerror!void {
     var allocator = gpa.allocator();
 
     rl.initWindow(windowWidth, windowHeight, "Retro snake");
-    defer rl.closeWindow();
+    rl.initAudioDevice();
+    defer {
+        rl.closeAudioDevice();
+        rl.closeWindow();
+    }
+
+    const waveSound = try rl.loadWave("eat.wav");
+    const eatSound = rl.loadSoundFromWave(waveSound);
+
+    defer {
+        rl.unloadWave(waveSound);
+        rl.unloadSound(eatSound);
+    }
 
     rl.setTargetFPS(60);
 
-    var game: Game = try .init(&allocator);
+    var game: Game = try .init(&allocator, &eatSound);
     defer game.deinit();
 
     while (!rl.windowShouldClose()) {
